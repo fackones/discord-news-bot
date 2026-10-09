@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-Discord 全球财经、Web3 加密货币与国际突发新闻实时聚合转发系统
+Discord 专业金融与投资专属资讯系统 (F1-F5 套件)
 包含:
-1. 财经金融: 华尔街见闻 7x24 快讯、新浪财经 7x24 环球快讯
-2. Web3 加密货币: CoinTelegraph、CoinDesk (智能中英双语)、币安重大公告
-3. 全球突发大事件: CNBC 全球突发要闻 (智能中英双语)
+F1. 金十/华尔街宏观 7x24 (外汇、黄金、原油、美联储决议、宏观指标)
+F2. 财联社/新浪电报 7x24 (A股盘面、行业政策、上市公司突发公告)
+F3. 第一财经/投资精选 7x24 (机构龙虎榜、热点个股、独家研报)
+F4. 路透社 (Reuters Business) (全球商业财经与跨国巨头突发，智能双语)
+F5. 彭博社 (Bloomberg Markets) (华尔街顶级机构动态与市场深度，智能双语)
 """
 
 import os
@@ -15,7 +17,6 @@ import functools
 import requests
 import feedparser
 
-# 确保控制台支持 UTF-8 输出并实时刷新
 if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -42,18 +43,16 @@ def load_config():
                 cfg = json.load(f)
         except Exception:
             pass
-    # 优先从环境变量读取 Webhook（GitHub Actions Secrets 规范）
     env_webhook = os.environ.get("DISCORD_WEBHOOK_URL", "").strip()
     if env_webhook:
         cfg["webhook_url"] = env_webhook
     if "sources" not in cfg:
         cfg["sources"] = {
-            "wscn_finance": True,
-            "sina_finance": True,
-            "cointelegraph_web3": True,
-            "coindesk_web3": True,
-            "binance_web3": True,
-            "cnbc_global": True
+            "f1_macro": True,
+            "f2_telegraph": True,
+            "f3_hot_invest": True,
+            "f4_reuters": True,
+            "f5_bloomberg": True
         }
     return cfg
 
@@ -68,7 +67,6 @@ def save_seen_id(news_id):
         f.write(news_id.strip() + "\n")
 
 def translate_to_zh(text):
-    """自动将英文标题翻译为中文，提供双语对照"""
     if not text:
         return ""
     try:
@@ -84,9 +82,8 @@ def translate_to_zh(text):
     return ""
 
 def send_discord_webhook(webhook_url, title, summary, link, source_name, color=3447003):
-    """通过 Webhook 推送 Embed 格式消息到 Discord"""
     payload = {
-        "username": f"快讯播报 | {source_name}",
+        "username": f"金融投资快讯 | {source_name}",
         "avatar_url": "https://cdn-icons-png.flaticon.com/512/2965/2965879.png",
         "embeds": [
             {
@@ -95,7 +92,7 @@ def send_discord_webhook(webhook_url, title, summary, link, source_name, color=3
                 "description": summary[:1500] if summary else "点击上方标题查看详情",
                 "color": color,
                 "footer": {
-                    "text": f"{source_name} • 实时资讯"
+                    "text": f"{source_name} • 实时金融行情"
                 },
                 "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             }
@@ -112,10 +109,10 @@ def send_discord_webhook(webhook_url, title, summary, link, source_name, color=3
         print(f"[推送异常] {e}")
     return False
 
-# ================= 1. 财经与金融快讯 =================
+# ================= 数据采集函数 (F1 - F5) =================
 
-def fetch_wscn():
-    """华尔街见闻 7x24 全球财经实时快讯"""
+def fetch_f1_macro():
+    """F1: 金十/华尔街见闻 7x24 全球宏观快讯"""
     items = []
     try:
         url = "https://api-one-wscn.awtmt.com/apiv1/content/lives?channel=global-channel&limit=6"
@@ -125,22 +122,21 @@ def fetch_wscn():
             title = item.get("title") or ""
             content = item.get("content_text") or ""
             display_title = title if title else (content[:50] + "...")
-            link = f"https://wallstreetcn.com/live/global"
             if item_id:
                 items.append({
-                    "id": f"wscn_{item_id}",
-                    "title": f"📈 {display_title}",
+                    "id": f"f1_{item_id}",
+                    "title": f"🏛️ 【宏观指标】{display_title}",
                     "summary": content[:400] if content else "无详细内容",
-                    "link": link,
-                    "source": "华尔街见闻 7x24",
+                    "link": "https://wallstreetcn.com/live/global",
+                    "source": "金十/华尔街宏观 7x24",
                     "color": 15844367 # 金色
                 })
     except Exception as e:
-        print(f"[华尔街见闻异常] {e}")
+        print(f"[F1 宏观快讯异常] {e}")
     return items
 
-def fetch_sina_finance():
-    """新浪财经 7x24 全球环球快讯"""
+def fetch_f2_telegraph():
+    """F2: 财联社/新浪财经 7x24 盘面与公告电报"""
     items = []
     try:
         url = "https://zhibo.sina.com.cn/api/zhibo/feed?page=1&page_size=6&zhibo_id=152"
@@ -152,50 +148,47 @@ def fetch_sina_finance():
             time_str = item.get("create_time", "")
             if item_id and text:
                 items.append({
-                    "id": f"sina_fin_{item_id}",
-                    "title": f"📊 {title}",
-                    "summary": f"{text}\n\n发布时间: {time_str}",
+                    "id": f"f2_{item_id}",
+                    "title": f"📈 【盘面电报】{title}",
+                    "summary": f"{text}\n\n时间: {time_str}",
                     "link": "https://finance.sina.com.cn/7x24/",
-                    "source": "新浪财经 7x24",
+                    "source": "财联社/新浪电报 7x24",
+                    "color": 15158332 # 红色
+                })
+    except Exception as e:
+        print(f"[F2 盘面电报异常] {e}")
+    return items
+
+def fetch_f3_hot_invest():
+    """F3: 第一财经/雪球热度 投资热点与机构动向"""
+    items = []
+    try:
+        url = "https://www.yicai.com/api/ajax/getbrieflist?page=1&pagesize=6"
+        res = session.get(url, timeout=6).json()
+        for item in res:
+            item_id = str(item.get("id") or item.get("LiveID"))
+            title = item.get("NewsTitle") or item.get("LiveTitle") or ""
+            content = item.get("LiveContent") or ""
+            link = f"https://m.yicai.com/brief/{item_id}.html"
+            if item_id and (title or content):
+                display_title = title if title else (content[:50] + "...")
+                items.append({
+                    "id": f"f3_{item_id}",
+                    "title": f"🔥 【投资热点】{display_title}",
+                    "summary": content[:400] if content else "点击链接查看深度内容",
+                    "link": link,
+                    "source": "第一财经/投资精选",
                     "color": 16753920 # 橙色
                 })
     except Exception as e:
-        print(f"[新浪财经异常] {e}")
+        print(f"[F3 投资热点异常] {e}")
     return items
 
-# ================= 2. Web3 / 加密货币快讯 =================
-
-def fetch_cointelegraph():
-    """CoinTelegraph 全球头部加密媒体 (带自动中文翻译)"""
+def fetch_f4_reuters():
+    """F4: 路透社 (Reuters Business) 全球商业与跨国企业 (智能双语)"""
     items = []
     try:
-        url = "https://cointelegraph.com/rss"
-        res = session.get(url, timeout=6)
-        feed = feedparser.parse(res.content)
-        for entry in feed.entries[:5]:
-            orig_title = entry.get("title", "").strip()
-            link = entry.get("link", "")
-            summary = entry.get("summary", "").replace("<p>", "").replace("</p>", "").strip()
-            if orig_title and link:
-                zh_title = translate_to_zh(orig_title)
-                title = f"⚡ {zh_title} ({orig_title})" if zh_title else f"⚡ {orig_title}"
-                items.append({
-                    "id": f"ct_{link}",
-                    "title": title,
-                    "summary": summary[:300] + ("..." if len(summary) > 300 else ""),
-                    "link": link,
-                    "source": "CoinTelegraph (Web3)",
-                    "color": 16766720 # 黄色
-                })
-    except Exception as e:
-        print(f"[CoinTelegraph异常] {e}")
-    return items
-
-def fetch_coindesk():
-    """CoinDesk 权威加密资讯 (带自动中文翻译)"""
-    items = []
-    try:
-        url = "https://www.coindesk.com/arc/outboundfeeds/rss/"
+        url = "https://feeds.feedburner.com/reuters/businessNews"
         res = session.get(url, timeout=6)
         feed = feedparser.parse(res.content)
         for entry in feed.entries[:5]:
@@ -204,49 +197,24 @@ def fetch_coindesk():
             summary = entry.get("summary", "").strip()
             if orig_title and link:
                 zh_title = translate_to_zh(orig_title)
-                title = f"🪙 {zh_title} ({orig_title})" if zh_title else f"🪙 {orig_title}"
+                title = f"🌐 【路透商业】{zh_title} ({orig_title})" if zh_title else f"🌐 【路透商业】{orig_title}"
                 items.append({
-                    "id": f"cd_{link}",
+                    "id": f"f4_{link}",
                     "title": title,
                     "summary": summary[:300] if summary else "点击查看全文",
                     "link": link,
-                    "source": "CoinDesk (Web3)",
-                    "color": 3066993 # 绿色
+                    "source": "路透社 (Reuters)",
+                    "color": 3447003 # 宝蓝色
                 })
     except Exception as e:
-        print(f"[CoinDesk异常] {e}")
+        print(f"[F4 路透社异常] {e}")
     return items
 
-def fetch_binance():
-    """币安官方公告 (新币上线与重大动态)"""
+def fetch_f5_bloomberg():
+    """F5: 彭博社 (Bloomberg Markets) 华尔街机构行情深度 (智能双语)"""
     items = []
     try:
-        url = "https://www.binance.com/bapi/composite/v1/public/cms/article/catalog/list/query?catalogId=48&pageNo=1&pageSize=5"
-        res = session.get(url, timeout=6).json()
-        for art in res.get("data", {}).get("articles", []):
-            code = str(art.get("code"))
-            title = art.get("title", "").strip()
-            link = f"https://www.binance.com/zh-CN/support/announcement/{code}"
-            if code and title:
-                items.append({
-                    "id": f"bn_{code}",
-                    "title": f"🔶 币安公告: {title}",
-                    "summary": f"币安官方最新公告发布，点击链接查看全文。",
-                    "link": link,
-                    "source": "Binance 官方",
-                    "color": 15844367 # 币安黄
-                })
-    except Exception as e:
-        print(f"[币安公告异常] {e}")
-    return items
-
-# ================= 3. 全球与国际大事件 =================
-
-def fetch_cnbc():
-    """CNBC 全球突发与宏观大事件 (带自动中文翻译)"""
-    items = []
-    try:
-        url = "https://www.cnbc.com/id/100003114/device/rss/rss.html"
+        url = "https://feeds.bloomberg.com/markets/news.rss"
         res = session.get(url, timeout=6)
         feed = feedparser.parse(res.content)
         for entry in feed.entries[:5]:
@@ -255,17 +223,17 @@ def fetch_cnbc():
             summary = entry.get("summary", "").strip()
             if orig_title and link:
                 zh_title = translate_to_zh(orig_title)
-                title = f"🌍 {zh_title} ({orig_title})" if zh_title else f"🌍 {orig_title}"
+                title = f"📊 【彭博市场】{zh_title} ({orig_title})" if zh_title else f"📊 【彭博市场】{orig_title}"
                 items.append({
-                    "id": f"cnbc_{link}",
+                    "id": f"f5_{link}",
                     "title": title,
-                    "summary": summary[:300] if summary else "点击查看详情",
+                    "summary": summary[:300] if summary else "点击查看全文",
                     "link": link,
-                    "source": "CNBC 全球突发",
-                    "color": 3447003 # 蓝色
+                    "source": "彭博社 (Bloomberg)",
+                    "color": 10181046 # 紫色
                 })
     except Exception as e:
-        print(f"[CNBC异常] {e}")
+        print(f"[F5 彭博社异常] {e}")
     return items
 
 # ================= 主控制循环 =================
@@ -277,7 +245,7 @@ def main():
     sources_cfg = config.get("sources", {})
 
     print("=" * 65)
-    print("【全网多源快讯聚合系统】正在运行...")
+    print("【顶级金融与投资情报系统 F1-F5】正在运行...")
     print(f"数据源配置:")
     for k, v in sources_cfg.items():
         print(f" - {k}: {'启用' if v else '关闭'}")
@@ -290,23 +258,16 @@ def main():
     while True:
         all_news = []
 
-        # 1. 财经金融
-        if sources_cfg.get("wscn_finance", True):
-            all_news.extend(fetch_wscn())
-        if sources_cfg.get("sina_finance", True):
-            all_news.extend(fetch_sina_finance())
-
-        # 2. Web3 / 加密货币
-        if sources_cfg.get("cointelegraph_web3", True):
-            all_news.extend(fetch_cointelegraph())
-        if sources_cfg.get("coindesk_web3", True):
-            all_news.extend(fetch_coindesk())
-        if sources_cfg.get("binance_web3", True):
-            all_news.extend(fetch_binance())
-
-        # 3. 全球突发大事件
-        if sources_cfg.get("cnbc_global", True):
-            all_news.extend(fetch_cnbc())
+        if sources_cfg.get("f1_macro", True):
+            all_news.extend(fetch_f1_macro())
+        if sources_cfg.get("f2_telegraph", True):
+            all_news.extend(fetch_f2_telegraph())
+        if sources_cfg.get("f3_hot_invest", True):
+            all_news.extend(fetch_f3_hot_invest())
+        if sources_cfg.get("f4_reuters", True):
+            all_news.extend(fetch_f4_reuters())
+        if sources_cfg.get("f5_bloomberg", True):
+            all_news.extend(fetch_f5_bloomberg())
 
         # 首次启动：记录已有快照，并向各大分类分别推送 1 条样例
         if is_first_run:
