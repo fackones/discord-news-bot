@@ -1,0 +1,42 @@
+name: Discord News Dispatcher
+
+on:
+  schedule:
+    # 每 15 分钟自动运行一次 (Cron 表达式)
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # 支持在 GitHub 网页上手动点击按钮立即运行测试
+
+permissions:
+  contents: write # 允许将已推送记录 push 回仓库进行去重
+
+jobs:
+  dispatch_news:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Python 运行环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 安装依赖包
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 执行新闻采集与推送
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          python bot.py --once
+
+      - name: 保存已推送新闻记录（防重复推送）
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add seen_news.txt
+          git diff --staged --quiet || (git commit -m "chore: update news cache [skip ci]" && git push)
