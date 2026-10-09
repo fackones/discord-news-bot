@@ -1,0 +1,11 @@
+{
+  "webhook_url": "https://discord.com/api/webhooks/1558033108681494599/qG011ZylKZpDCGAoTRcu9I-8dg0HJeO8QYUA7iHXNv2UBEQNW9DMf_ENHz4wkCKTeLeU",
+  "check_interval_seconds": 10,
+  "sources": {
+    "f1_macro": true,
+    "f2_telegraph": true,
+    "f3_hot_invest": true,
+    "f4_reuters": true,
+    "f5_bloomberg": true
+  }
+}
